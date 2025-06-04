@@ -157,9 +157,9 @@ pub fn syscall_handler(
 	arg1: usize,
 	arg2: usize,
 	arg3: usize,
-	arg4: usize,
-	arg5: usize,
-	arg6: usize,
+	_arg4: usize,
+	_arg5: usize,
+	_arg6: usize,
 ) -> SyscallResult {
 	match syscall_num {
 		0 => sys_read(arg1, arg2 as *mut u8, arg3),
@@ -177,9 +177,9 @@ pub fn syscall_handler(
 }
 
 /// Read system call - placeholder implementation
-fn sys_read(fd: usize, buf: *mut u8, count: usize) -> SyscallResult {
+fn sys_read(_fd: usize, _buf: *mut u8, _count: usize) -> SyscallResult {
 	// For now, return 0 bytes read for stdin
-	if fd == 0 {
+	if _fd == 0 {
 		Ok(0)
 	} else {
 		Err(SyscallError::BadFileNumber)
@@ -203,7 +203,7 @@ fn sys_write(fd: usize, buf: *const u8, count: usize) -> SyscallResult {
 }
 
 /// Open system call - placeholder implementation
-fn sys_open(pathname: *const u8, flags: usize, mode: usize) -> SyscallResult {
+fn sys_open(_pathname: *const u8, _flags: usize, _mode: usize) -> SyscallResult {
 	// TODO: Implement file system and file opening
 	Err(SyscallError::NoSuchFileOrDirectory)
 }

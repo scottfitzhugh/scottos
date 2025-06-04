@@ -36,7 +36,7 @@ impl ScancodeStream {
 impl Stream for ScancodeStream {
 	type Item = u8;
 
-	fn poll_next(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Option<u8>> {
+	fn poll_next(self: Pin<&mut Self>, _cx: &mut Context) -> Poll<Option<u8>> {
 		let queue = SCANCODE_QUEUE.try_get().expect("scancode queue not initialized");
 
 		// fast path

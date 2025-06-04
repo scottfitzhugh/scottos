@@ -1,7 +1,5 @@
 use core::{future::Future, pin::Pin, task::{Context, Poll}};
 use alloc::boxed::Box;
-use alloc::{collections::BTreeMap, sync::Arc, task::Wake};
-use crossbeam_queue::ArrayQueue;
 
 pub mod executor;
 pub mod keyboard;
