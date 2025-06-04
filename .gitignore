@@ -1,0 +1,82 @@
+# Rust build artifacts
+/target/
+/Cargo.lock
+
+# Bootimage artifacts
+*.bin
+*.img
+*.iso
+
+# QEMU artifacts and logs
+qemu.log
+serial.txt
+*.qcow2
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# OS-specific files
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.directory
+.Trash-*
+
+# Debugging and profiling
+*.pdb
+gdb.txt
+*.gcda
+*.gcno
+*.profraw
+
+# Documentation build
+/book/
+/docs/_build/
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+
+# Rust-specific
+**/*.rs.bk
+*.pdb
+
+# Cargo
+.cargo/
+
+# Generated files
+/generated/
+
+# Custom OS artifacts
+/sysroot/
+/image/
+*.elf
+*.map
+
+# Virtual machine files
+*.vmdk
+*.vdi
+*.vmx
+*.vmxf
+*.nvram
+
+# Test artifacts
+/test-results/
+/coverage/ 
