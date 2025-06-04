@@ -1,28 +1,25 @@
 use x86_64::{
 	structures::paging::{
-		FrameAllocator, OffsetPageTable, PageTable, PhysFrame, Size4KiB,
+		FrameAllocator, PhysFrame, Size4KiB,
 	},
-	PhysAddr, VirtAddr,
+	PhysAddr,
 };
 use bootloader::bootinfo::{MemoryMap, MemoryRegionType};
+use bootloader::BootInfo;
 
-/// Initialize the memory management system
-pub unsafe fn init(physical_memory_offset: VirtAddr) -> OffsetPageTable<'static> {
-	let level_4_table = active_level_4_table(physical_memory_offset);
-	OffsetPageTable::new(level_4_table, physical_memory_offset)
-}
+/// Global frame allocator
+pub static mut FRAME_ALLOCATOR: Option<BootInfoFrameAllocator> = None;
 
-/// Get the active level 4 page table
-unsafe fn active_level_4_table(physical_memory_offset: VirtAddr) -> &'static mut PageTable {
-	use x86_64::registers::control::Cr3;
+/// Initialize the memory management system from BootInfo (simplified)
+pub fn init(boot_info: &'static BootInfo) {
+	let frame_allocator = unsafe {
+		BootInfoFrameAllocator::init(&boot_info.memory_map)
+	};
 
-	let (level_4_table_frame, _) = Cr3::read();
-
-	let phys = level_4_table_frame.start_address();
-	let virt = physical_memory_offset + phys.as_u64();
-	let page_table_ptr: *mut PageTable = virt.as_mut_ptr();
-
-	&mut *page_table_ptr
+	// Store frame allocator globally
+	unsafe {
+		FRAME_ALLOCATOR = Some(frame_allocator);
+	}
 }
 
 /// Frame allocator that returns usable frames from the bootloader's memory map
