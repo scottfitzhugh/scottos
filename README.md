@@ -55,37 +55,274 @@ ScottOS is a minimalist operating system written in Rust that aims to be fully P
 ## Building and Running
 
 ### Prerequisites
-- Rust nightly toolchain
-- `bootimage` tool: `cargo install bootimage`
-- QEMU (for testing): `brew install qemu` or equivalent
 
-### Building
+Before you can build and run ScottOS, you need to install the following components:
+
+#### 1. Install Rust Nightly Toolchain
 ```bash
-# Install required components
+# Install rustup if you haven't already
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+
+# Restart your shell or run:
+source ~/.cargo/env
+
+# Install and set nightly as default for this project
+rustup toolchain install nightly
+rustup default nightly
+
+# Verify installation
+rustc --version
+# Should show something like: rustc 1.89.0-nightly
+```
+
+#### 2. Install Required Rust Components
+```bash
+# Add rust source code (required for building core library from source)
 rustup component add rust-src
+
+# Add LLVM tools (required for linking)
 rustup component add llvm-tools-preview
 
-# Build the OS
+# Verify components are installed
+rustup component list --installed
+```
+
+#### 3. Install Bootimage Tool
+```bash
+# Install the bootimage tool for creating bootable disk images
+cargo install bootimage
+
+# Verify installation
+cargo bootimage --version
+# Should show: bootimage 0.10.3 (or similar)
+```
+
+#### 4. Install QEMU (for running the OS)
+```bash
+# On macOS:
+brew install qemu
+
+# On Ubuntu/Debian:
+sudo apt update
+sudo apt install qemu-system-x86
+
+# On Arch Linux:
+sudo pacman -S qemu
+
+# On Windows:
+# Download and install QEMU from https://www.qemu.org/download/
+
+# Verify installation
+qemu-system-x86_64 --version
+```
+
+### Step-by-Step Build Instructions
+
+Open a new terminal window and follow these steps:
+
+#### 1. Clone and Navigate to the Project
+```bash
+# Navigate to the project directory
+cd /path/to/scottos
+
+# Verify you're in the right directory
+ls -la
+# You should see Cargo.toml, src/, x86_64-scottos.json, etc.
+```
+
+#### 2. Clean Build (Optional but Recommended)
+```bash
+# Clean any previous build artifacts
+cargo clean
+
+# This removes the target/ directory and ensures a fresh build
+```
+
+#### 3. Build the Kernel
+```bash
+# Build the ScottOS kernel
 cargo build
 
-# Create bootable image
-cargo bootimage
+# You should see output like:
+#   Compiling scottos v0.1.0 (/path/to/scottos)
+#   Finished `dev` profile [unoptimized + debuginfo] target(s) in X.XXs
 ```
 
-### Running in QEMU
+#### 4. Create Bootable Image
 ```bash
-# Run the OS in QEMU
+# Create a bootable disk image
+cargo bootimage
+
+# You should see output like:
+#   Building kernel
+#   Finished `dev` profile [optimized + debuginfo] target(s) in X.XXs
+#   Building bootloader
+#   Compiling bootloader v0.9.31
+#   Finished `release` profile [optimized + debuginfo] target(s) in X.XXs
+#   Created bootimage for `scottos` at `/path/to/target/x86_64-scottos/debug/bootimage-scottos.bin`
+```
+
+#### 5. Run ScottOS in QEMU
+```bash
+# Method 1: Use cargo run (easiest)
 cargo run
 
-# Or run the bootimage directly
+# Method 2: Run QEMU directly with more control
 qemu-system-x86_64 -drive format=raw,file=target/x86_64-scottos/debug/bootimage-scottos.bin
+
+# Method 3: Run with additional QEMU options (debugging)
+qemu-system-x86_64 \
+  -drive format=raw,file=target/x86_64-scottos/debug/bootimage-scottos.bin \
+  -serial stdio \
+  -display curses
 ```
 
-### Testing
+### What You Should See
+
+When ScottOS boots successfully, you should see output similar to:
+
+```
+ScottOS v0.1.0
+Initializing kernel...
+GDT initialized
+Interrupts initialized
+Memory management initialized
+File system initialized
+Process scheduler initialized
+ScottOS initialization complete!
+System ready for operation
+Async task running!
+```
+
+### Testing the System
+
+#### 1. Keyboard Input
+- Type on your keyboard - characters should appear on screen
+- The async keyboard system processes input asynchronously
+
+#### 2. System Calls (when implemented)
+- Various POSIX system calls are stubbed out for future implementation
+
+#### 3. Run Kernel Tests
 ```bash
-# Run kernel tests
+# Run the kernel test suite
+cargo test
+
+# This will run tests in QEMU and exit automatically
+```
+
+### Troubleshooting
+
+#### Common Issues and Solutions
+
+**Issue**: `can't find crate for 'core'`
+```bash
+# Solution: Ensure rust-src is installed
+rustup component add rust-src
+```
+
+**Issue**: `rust-lld not found`
+```bash
+# Solution: Install LLVM tools
+rustup component add llvm-tools-preview
+```
+
+**Issue**: `bootimage not found`
+```bash
+# Solution: Install bootimage tool
+cargo install bootimage
+```
+
+**Issue**: QEMU not starting or black screen
+```bash
+# Solution 1: Try with serial output
+qemu-system-x86_64 \
+  -drive format=raw,file=target/x86_64-scottos/debug/bootimage-scottos.bin \
+  -serial stdio
+
+# Solution 2: Enable VGA text mode
+qemu-system-x86_64 \
+  -drive format=raw,file=target/x86_64-scottos/debug/bootimage-scottos.bin \
+  -vga std
+```
+
+**Issue**: Build warnings about unused code
+```bash
+# These are normal for a development OS - the code is ready for future features
+# You can ignore warnings or build with:
+cargo build --quiet
+```
+
+### Development Workflow
+
+#### Quick Development Cycle
+```bash
+# 1. Make code changes
+# 2. Build and run in one command
+cargo run
+
+# 3. Or for just building without running
+cargo build
+
+# 4. Run tests
 cargo test
 ```
+
+#### Debugging Tips
+```bash
+# Enable serial output for debugging
+cargo run -- -serial stdio
+
+# Build in release mode (faster but less debug info)
+cargo build --release
+cargo bootimage --release
+
+# View build artifacts
+ls -la target/x86_64-scottos/debug/
+```
+
+### Advanced Usage
+
+#### Custom QEMU Options
+```bash
+# Run with custom memory size
+qemu-system-x86_64 \
+  -drive format=raw,file=target/x86_64-scottos/debug/bootimage-scottos.bin \
+  -m 512M
+
+# Enable KVM acceleration (Linux only)
+qemu-system-x86_64 \
+  -enable-kvm \
+  -drive format=raw,file=target/x86_64-scottos/debug/bootimage-scottos.bin
+
+# Run in background
+qemu-system-x86_64 \
+  -drive format=raw,file=target/x86_64-scottos/debug/bootimage-scottos.bin \
+  -nographic \
+  -serial stdio &
+```
+
+#### Cleaning Up
+```bash
+# Remove all build artifacts
+cargo clean
+
+# Remove bootimage cache
+rm -rf ~/.cargo/registry/cache/
+
+# Full clean rebuild
+cargo clean && cargo build && cargo bootimage && cargo run
+```
+
+### Next Steps
+
+Once you have ScottOS running:
+1. **Explore the code**: Check out the modular architecture in `src/`
+2. **Add features**: Implement additional system calls or device drivers  
+3. **Test thoroughly**: Use `cargo test` to run the test suite
+4. **Experiment**: Try modifying the kernel and see the results
+
+Remember: Press `Ctrl+C` in the terminal to stop QEMU and return to your shell.
 
 ## Code Structure
 
