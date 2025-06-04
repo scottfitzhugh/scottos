@@ -49,7 +49,31 @@ impl Stream for ScancodeStream {
 	}
 }
 
-/// Async task for printing keypresses
+/// Async task for processing keypresses through the shell
+pub async fn process_shell_input() {
+	let mut scancodes = ScancodeStream::new();
+	let mut keyboard = Keyboard::new(layouts::Us104Key, ScancodeSet1,
+		HandleControl::Ignore);
+
+	while let Some(scancode) = scancodes.next().await {
+		if let Ok(Some(key_event)) = keyboard.add_byte(scancode) {
+			if let Some(key) = keyboard.process_keyevent(key_event) {
+				match key {
+					DecodedKey::Unicode(character) => {
+						// Send character to shell for processing
+						crate::shell::SHELL.lock().process_char(character);
+					}
+					DecodedKey::RawKey(_key) => {
+						// For now, ignore raw keys like function keys
+						// Could be extended to handle special keys
+					}
+				}
+			}
+		}
+	}
+}
+
+/// Async task for printing keypresses (legacy - kept for compatibility)
 pub async fn print_keypresses() {
 	let mut scancodes = ScancodeStream::new();
 	let mut keyboard = Keyboard::new(layouts::Us104Key, ScancodeSet1,

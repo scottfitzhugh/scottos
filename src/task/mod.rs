@@ -8,7 +8,7 @@ pub use executor::Executor;
 
 /// Unique task identifier
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-struct TaskId(u64);
+pub(crate) struct TaskId(u64);
 
 impl TaskId {
 	fn new() -> Self {
@@ -20,8 +20,8 @@ impl TaskId {
 
 /// A cooperative task with a unique ID
 pub struct Task {
-	id: TaskId,
-	future: Pin<Box<dyn Future<Output = ()>>>,
+	pub(crate) id: TaskId,
+	pub(crate) future: Pin<Box<dyn Future<Output = ()>>>,
 }
 
 impl Task {
@@ -34,7 +34,7 @@ impl Task {
 	}
 
 	/// Poll the task and return whether it's ready
-	fn poll(&mut self, context: &mut Context) -> Poll<()> {
+	pub(crate) fn poll(&mut self, context: &mut Context) -> Poll<()> {
 		self.future.as_mut().poll(context)
 	}
 } 

@@ -21,6 +21,7 @@ pub mod keyboard;
 pub mod syscall;
 pub mod fs;
 pub mod process;
+pub mod shell;
 
 /// Initialize the kernel
 pub fn init() {
