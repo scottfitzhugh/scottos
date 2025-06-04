@@ -238,7 +238,7 @@ impl SimpleShell {
                 writer.write_string("Rebooting system...\n", 0x0C);
                 // Simple reboot via keyboard controller
                 unsafe {
-                    let mut port = 0x64u16;
+                    let port = 0x64u16;
                     core::arch::asm!("out dx, al", in("dx") port, in("al") 0xFEu8);
                 }
             }
