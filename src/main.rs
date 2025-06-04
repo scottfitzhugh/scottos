@@ -3,6 +3,8 @@
 #![feature(custom_test_frameworks)]
 #![test_runner(scottos::test_runner)]
 #![reexport_test_harness_main = "test_main"]
+#![feature(abi_x86_interrupt)]
+#![feature(alloc_error_handler)]
 
 use core::panic::PanicInfo;
 use bootloader::{BootInfo, entry_point};
@@ -128,144 +130,6 @@ impl VgaWriter {
     }
 }
 
-/// Simple shell state
-struct SimpleShell {
-    current_line: [u8; MAX_COMMAND_LEN],
-    current_len: usize,
-    command_history: [[u8; MAX_COMMAND_LEN]; MAX_HISTORY],
-    history_count: usize,
-}
-
-impl SimpleShell {
-    fn new() -> Self {
-        Self {
-            current_line: [0; MAX_COMMAND_LEN],
-            current_len: 0,
-            command_history: [[0; MAX_COMMAND_LEN]; MAX_HISTORY],
-            history_count: 0,
-        }
-    }
-    
-    fn add_char(&mut self, c: u8) -> bool {
-        if self.current_len < MAX_COMMAND_LEN - 1 {
-            self.current_line[self.current_len] = c;
-            self.current_len += 1;
-            true
-        } else {
-            false
-        }
-    }
-    
-    fn backspace(&mut self) -> bool {
-        if self.current_len > 0 {
-            self.current_len -= 1;
-            self.current_line[self.current_len] = 0;
-            true
-        } else {
-            false
-        }
-    }
-    
-    fn execute_command(&mut self, writer: &mut VgaWriter) {
-        // Save command to history
-        if self.current_len > 0 && self.history_count < MAX_HISTORY {
-            for i in 0..self.current_len {
-                self.command_history[self.history_count][i] = self.current_line[i];
-            }
-            // Null terminate
-            if self.current_len < MAX_COMMAND_LEN {
-                self.command_history[self.history_count][self.current_len] = 0;
-            }
-            self.history_count += 1;
-        }
-        
-        // Convert command to string slice for processing
-        let command_str = core::str::from_utf8(&self.current_line[..self.current_len]).unwrap_or("");
-        
-        writer.new_line();
-        
-        // Process command
-        match command_str.trim() {
-            "" => {
-                // Empty command
-            }
-            "help" => {
-                writer.write_string("Available commands:\n", 0x0A);
-                writer.write_string("  help     - Show this help message\n", 0x07);
-                writer.write_string("  clear    - Clear the screen\n", 0x07);
-                writer.write_string("  echo     - Echo text back\n", 0x07);
-                writer.write_string("  uname    - System information\n", 0x07);
-                writer.write_string("  whoami   - Current user\n", 0x07);
-                writer.write_string("  uptime   - System uptime\n", 0x07);
-                writer.write_string("  version  - OS version\n", 0x07);
-                writer.write_string("  history  - Command history\n", 0x07);
-                writer.write_string("  reboot   - Restart system\n", 0x07);
-            }
-            "clear" => {
-                writer.clear_screen();
-            }
-            "uname" => {
-                writer.write_string("ScottOS v0.1.0 x86_64\n", 0x0A);
-            }
-            "whoami" => {
-                writer.write_string("root\n", 0x0A);
-            }
-            "uptime" => {
-                writer.write_string("System has been running since boot\n", 0x0A);
-            }
-            "version" => {
-                writer.write_string("ScottOS v0.1.0\n", 0x0A);
-                writer.write_string("Built with Rust - A Minimalist POSIX-Compliant OS\n", 0x07);
-            }
-            "history" => {
-                writer.write_string("Command history:\n", 0x0A);
-                for i in 0..self.history_count {
-                    writer.write_string("  ", 0x07);
-                    // Find null terminator or end of command
-                    let mut len = 0;
-                    for j in 0..MAX_COMMAND_LEN {
-                        if self.command_history[i][j] == 0 {
-                            break;
-                        }
-                        len += 1;
-                    }
-                    let cmd_str = core::str::from_utf8(&self.command_history[i][..len]).unwrap_or("");
-                    writer.write_string(cmd_str, 0x0F);
-                    writer.write_string("\n", 0x07);
-                }
-            }
-            "reboot" => {
-                writer.write_string("Rebooting system...\n", 0x0C);
-                // Simple reboot via keyboard controller
-                unsafe {
-                    let port = 0x64u16;
-                    core::arch::asm!("out dx, al", in("dx") port, in("al") 0xFEu8);
-                }
-            }
-            cmd if cmd.starts_with("echo ") => {
-                let text = &cmd[5..]; // Skip "echo "
-                writer.write_string(text, 0x0A);
-                writer.write_string("\n", 0x07);
-            }
-            _ => {
-                writer.write_string("Command not found: ", 0x0C);
-                writer.write_string(command_str, 0x0F);
-                writer.write_string("\n", 0x07);
-                writer.write_string("Type 'help' for available commands.\n", 0x08);
-            }
-        }
-        
-        // Clear current command
-        self.current_len = 0;
-        for i in 0..MAX_COMMAND_LEN {
-            self.current_line[i] = 0;
-        }
-        
-        // Show new prompt
-        writer.write_string("scottos:~$ ", 0x0B);
-    }
-}
-
 /// Read a scancode from the keyboard
 fn read_scancode() -> Option<u8> {
     use x86_64::instructions::port::Port;
@@ -308,10 +172,10 @@ fn scancode_to_ascii(scancode: u8) -> Option<u8> {
 /// Working kernel with shell command prompt
 fn kernel_main(_boot_info: &'static BootInfo) -> ! {
     let mut writer = VgaWriter::new();
-    let mut shell = SimpleShell::new();
+    let mut shell = Shell::new();
     
     // Initialize basic systems (GDT, IDT, interrupts)
-    scottos::init();
+    //scottos::init();
     
     // Clear screen
     writer.clear_screen();
@@ -324,7 +188,6 @@ fn kernel_main(_boot_info: &'static BootInfo) -> ! {
     writer.write_string("╔══════════════════════════════════════════════════════════════════════════════╗\n", 0x0F);
     writer.write_string("║                                ScottOS v0.1.0                               ║\n", 0x0F);
     writer.write_string("║                      A Minimalist POSIX-Compliant OS                       ║\n", 0x0F);
-    writer.write_string("║                              Built with Rust                               ║\n", 0x0F);
     writer.write_string("╚══════════════════════════════════════════════════════════════════════════════╝\n", 0x0F);
     writer.write_string("\n", 0x07);
     
@@ -338,6 +201,7 @@ fn kernel_main(_boot_info: &'static BootInfo) -> ! {
     
     // Main shell loop
     loop {
+        /*
         // Check for keyboard input
         if let Some(scancode) = read_scancode() {
             match scancode {
@@ -359,12 +223,70 @@ fn kernel_main(_boot_info: &'static BootInfo) -> ! {
                 }
             }
         }
-        
+        */
         // Halt CPU to save power
         unsafe {
             core::arch::asm!("hlt");
         }
     }
+}
+
+
+/// Extremely minimal kernel entry point
+fn kernel_main_minimal(_boot_info: &'static BootInfo) -> ! {
+	// Direct VGA buffer access - most basic possible output
+	let vga_buffer = 0xb8000 as *mut u8;
+	
+	// Write "HELLO SCOTTOS" directly to VGA buffer
+	unsafe {
+		*vga_buffer.offset(0) = b'H';
+		*vga_buffer.offset(1) = 0x0f; // White on black
+		*vga_buffer.offset(2) = b'E';
+		*vga_buffer.offset(3) = 0x0f;
+		*vga_buffer.offset(4) = b'L';
+		*vga_buffer.offset(5) = 0x0f;
+		*vga_buffer.offset(6) = b'L';
+		*vga_buffer.offset(7) = 0x0f;
+		*vga_buffer.offset(8) = b'O';
+		*vga_buffer.offset(9) = 0x0f;
+		*vga_buffer.offset(10) = b' ';
+		*vga_buffer.offset(11) = 0x0f;
+		*vga_buffer.offset(12) = b'S';
+		*vga_buffer.offset(13) = 0x0f;
+		*vga_buffer.offset(14) = b'C';
+		*vga_buffer.offset(15) = 0x0f;
+		*vga_buffer.offset(16) = b'O';
+		*vga_buffer.offset(17) = 0x0f;
+		*vga_buffer.offset(18) = b'T';
+		*vga_buffer.offset(19) = 0x0f;
+		*vga_buffer.offset(20) = b'T';
+		*vga_buffer.offset(21) = 0x0f;
+		*vga_buffer.offset(22) = b'O';
+		*vga_buffer.offset(23) = 0x0f;
+		*vga_buffer.offset(24) = b'S';
+		*vga_buffer.offset(25) = 0x0f;
+		*vga_buffer.offset(26) = b' ';
+		*vga_buffer.offset(27) = 0x0f;
+		*vga_buffer.offset(28) = b'B';
+		*vga_buffer.offset(29) = 0x0f;
+		*vga_buffer.offset(30) = b'O';
+		*vga_buffer.offset(31) = 0x0f;
+		*vga_buffer.offset(32) = b'O';
+		*vga_buffer.offset(33) = 0x0f;
+		*vga_buffer.offset(34) = b'T';
+		*vga_buffer.offset(35) = 0x0f;
+		*vga_buffer.offset(36) = b'E';
+		*vga_buffer.offset(37) = 0x0f;
+		*vga_buffer.offset(38) = b'D';
+		*vga_buffer.offset(39) = 0x0f;
+	}
+	
+	// Infinite halt loop - no interrupts, no complex operations
+	loop {
+		unsafe {
+			core::arch::asm!("hlt");
+		}
+	}
 }
 
 /// Test runner for kernel tests
