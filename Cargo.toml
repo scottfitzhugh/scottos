@@ -1,8 +1,8 @@
 [package]
-name = "ScottOS"
-version = "0.0.1"
-edition = "2024"
+name = "scottos"
+version = "0.1.0"
 authors = ["Scott Fitzhugh <scott@fitzhugh.me>"]
+edition = "2024"
 
 [dependencies]
 bootloader = "0.9"
