@@ -8,6 +8,10 @@
 
 use core::panic::PanicInfo;
 use bootloader::{BootInfo, entry_point};
+use scottos::{self, task::Executor};
+use scottos::task;
+use scottos::task::keyboard::process_shell_input;
+use scottos::{allocator, memory, fs, process, shell};
 
 entry_point!(kernel_main);
 
@@ -170,12 +174,22 @@ fn scancode_to_ascii(scancode: u8) -> Option<u8> {
 }
 
 /// Working kernel with shell command prompt
-fn kernel_main(_boot_info: &'static BootInfo) -> ! {
+fn kernel_main(boot_info: &'static BootInfo) -> ! {
     let mut writer = VgaWriter::new();
-    let mut shell = Shell::new();
+    // Initialize low-level kernel subsystems
+    scottos::init();
+
+    // Initialize memory subsystems
+    memory::init(boot_info);
+    allocator::init_heap().expect("heap initialization failed");
+
+    // Initialize higher-level services
+    fs::init_filesystem();
+    process::init();
+    shell::init_shell();
     
     // Initialize basic systems (GDT, IDT, interrupts)
-    //scottos::init();
+    // init already called above
     
     // Clear screen
     writer.clear_screen();
@@ -196,39 +210,10 @@ fn kernel_main(_boot_info: &'static BootInfo) -> ! {
     writer.write_string("Interactive shell ready. Type 'help' for available commands.\n", 0x07);
     writer.write_string("\n", 0x07);
     
-    // Display initial shell prompt
-    writer.write_string("scottos:~$ ", 0x0B); // Light cyan
-    
-    // Main shell loop
-    loop {
-        /*
-        // Check for keyboard input
-        if let Some(scancode) = read_scancode() {
-            match scancode {
-                0x0E => { // Backspace
-                    if shell.backspace() {
-                        writer.backspace();
-                    }
-                }
-                0x1C => { // Enter
-                    shell.execute_command(&mut writer);
-                }
-                code => {
-                    // Try to convert to ASCII
-                    if let Some(ascii) = scancode_to_ascii(code) {
-                        if shell.add_char(ascii) {
-                            writer.write_byte(ascii, 0x0F);
-                        }
-                    }
-                }
-            }
-        }
-        */
-        // Halt CPU to save power
-        unsafe {
-            core::arch::asm!("hlt");
-        }
-    }
+    // Spawn async tasks and run executor
+    let mut executor = Executor::new();
+    executor.spawn(task::Task::new(process_shell_input()));
+    executor.run()
 }
 
 

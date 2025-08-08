@@ -4,9 +4,11 @@ use core::{pin::Pin, task::{Poll, Context}};
 use futures_util::stream::{Stream, StreamExt};
 use pc_keyboard::{layouts, DecodedKey, HandleControl, Keyboard, ScancodeSet1};
 use crate::{println, print};
+use futures_util::task::AtomicWaker;
 
 /// Keyboard scancode queue
 static SCANCODE_QUEUE: OnceCell<ArrayQueue<u8>> = OnceCell::uninit();
+static WAKER: AtomicWaker = AtomicWaker::new();
 
 /// Called by the keyboard interrupt handler
 /// Must not block or allocate.
@@ -14,6 +16,9 @@ pub(crate) fn add_scancode(scancode: u8) {
 	if let Ok(queue) = SCANCODE_QUEUE.try_get() {
 		if let Err(_) = queue.push(scancode) {
 			println!("WARNING: scancode queue full; dropping keyboard input");
+		} else {
+			// Wake any task waiting on keyboard input
+			WAKER.wake();
 		}
 	} else {
 		println!("WARNING: scancode queue uninitialized");
@@ -36,7 +41,7 @@ impl ScancodeStream {
 impl Stream for ScancodeStream {
 	type Item = u8;
 
-	fn poll_next(self: Pin<&mut Self>, _cx: &mut Context) -> Poll<Option<u8>> {
+	fn poll_next(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Option<u8>> {
 		let queue = SCANCODE_QUEUE.try_get().expect("scancode queue not initialized");
 
 		// fast path
@@ -44,7 +49,12 @@ impl Stream for ScancodeStream {
 			return Poll::Ready(Some(scancode));
 		}
 
-		// TODO: register waker for keyboard interrupt
+		// register waker and check again to avoid race conditions
+		WAKER.register(cx.waker());
+		if let Ok(scancode) = queue.pop() {
+			return Poll::Ready(Some(scancode));
+		}
+
 		Poll::Pending
 	}
 }

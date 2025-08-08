@@ -3,6 +3,7 @@ use crate::{println, gdt, hlt_loop};
 use lazy_static::lazy_static;
 use pic8259::ChainedPics;
 use spin;
+use x86_64::VirtAddr;
 
 /// Offset for PIC interrupts
 pub const PIC_1_OFFSET: u8 = 32;
@@ -38,16 +39,16 @@ lazy_static! {
 		// CPU Exception handlers
 		idt.breakpoint.set_handler_fn(breakpoint_handler);
 		unsafe {
-			idt.double_fault.set_handler_fn(double_fault_handler)
+			// Use set_handler_addr due to nightly ABI changes
+			idt.double_fault
+				.set_handler_addr(VirtAddr::new(double_fault_handler as u64))
 				.set_stack_index(gdt::DOUBLE_FAULT_IST_INDEX);
 		}
 		idt.page_fault.set_handler_fn(page_fault_handler);
 		
-		// Hardware interrupt handlers
-		idt[InterruptIndex::Timer.as_usize()]
-			.set_handler_fn(timer_interrupt_handler);
-		idt[InterruptIndex::Keyboard.as_usize()]
-			.set_handler_fn(keyboard_interrupt_handler);
+		// Hardware interrupt handlers (use u8 indexing)
+		idt[InterruptIndex::Timer.as_u8()].set_handler_fn(timer_interrupt_handler);
+		idt[InterruptIndex::Keyboard.as_u8()].set_handler_fn(keyboard_interrupt_handler);
 		
 		idt
 	};
@@ -65,7 +66,7 @@ extern "x86-interrupt" fn breakpoint_handler(stack_frame: InterruptStackFrame) {
 
 /// Double fault exception handler - critical system error
 extern "x86-interrupt" fn double_fault_handler(
-	stack_frame: InterruptStackFrame, _error_code: u64) -> ! {
+	stack_frame: InterruptStackFrame, _error_code: u64) {
 	panic!("EXCEPTION: DOUBLE FAULT\n{:#?}", stack_frame);
 }
 
