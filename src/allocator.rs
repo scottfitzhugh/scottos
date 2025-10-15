@@ -4,20 +4,17 @@ use linked_list_allocator::LockedHeap;
 #[global_allocator]
 static ALLOCATOR: LockedHeap = LockedHeap::empty();
 
-/// Heap start address
-pub const HEAP_START: usize = 0x_4444_4444_0000;
-/// Heap size in bytes (1 MB)
-pub const HEAP_SIZE: usize = 1024 * 1024;
+/// Heap size in bytes (100 KB - enough for shell and basic operations)
+pub const HEAP_SIZE: usize = 100 * 1024;
 
-/// Initialize the heap allocator (simplified version)
+/// Static heap buffer in the BSS section
+static mut HEAP: [u8; HEAP_SIZE] = [0; HEAP_SIZE];
+
+/// Initialize the heap allocator using a static buffer
 pub fn init_heap() -> Result<(), &'static str> {
-	// For now, use a simple heap initialization without complex memory mapping
-	// This is a simplified approach for getting the shell working
 	unsafe {
-		// Note: This is a simplified approach that assumes the bootloader
-		// has already set up basic memory management. In a full implementation,
-		// you would need proper page table setup.
-		ALLOCATOR.lock().init(HEAP_START, HEAP_SIZE);
+		let heap_start = HEAP.as_ptr() as usize;
+		ALLOCATOR.lock().init(heap_start, HEAP_SIZE);
 	}
 
 	Ok(())
